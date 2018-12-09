@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>UNSW Chatbot</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=0.37">
+
+<link href="/static/my.css" rel="stylesheet">
+<script src="/static/my.js"></script>
+
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,400,400i,500,500i,700,700i" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<link href="https://courseloop-ui.s3.amazonaws.com/handbook/unsw/unswPUBLICPROD/assets/all.css?v=2018-9-4-19-8" rel="stylesheet">
+<script src="https://courseloop-ui.s3.amazonaws.com/handbook/unsw/unswPUBLICPROD/assets/all.js?v=2018-9-4-19-8"></script>
+<link rel="stylesheet" href="https://www.handbook.unsw.edu.au/application/theme_files/css/print.css">
+<link rel="stylesheet" href="https://cdn.bootcss.com/bootstrap/4.1.0/css/bootstrap.min.css">
+<script src="https://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
+<script src="https://cdn.bootcss.com/popper.js/1.12.5/umd/popper.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.0/jquery.min.js"></script>
+<link href="https://courseloop-ui.s3.amazonaws.com/handbook/unsw/unswPUBLICPROD/assets/all.css?v=2018-9-7-1-46" rel="stylesheet">
+<script src="https://courseloop-ui.s3.amazonaws.com/handbook/unsw/unswPUBLICPROD/assets/all.js?v=2018-9-7-1-46"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+<base target="_blank">
+
+<script>/*global $*/
+$(document).ready(function(){
+
+  //glrobal variable
+  var loading_animation = String.raw`<div class="loading"><div class="msg_window"><div class="loader"></div></div></div>`;
+  var user_html = String.raw`<div class="msg_window"><img src="/static/male.png" alt="Avatar" class="right" ><p>{my_content}</p></div>`;
+  var button_html = String.raw`<div class="msg_window"><img src="/static/lion1.png" alt="Avatar"><button class="btn btn-outline-secondary" data-toggle="modal" data-target="#{id}">See details</button></div>`;
+  var largetcontent_html = String.raw`<div class="modal fade" id="{id}" tabindex="-1" role="dialog" aria-hidden="true"><div class="modal-dialog modal-lg" role="document"><div class="modal-content"><div class="modal-header"><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button></div><div class="modal-body">{content}</div></div></div></div>`;
+  var shortcontent_html = String.raw`<div class="msg_window"> <img src="/static/lion1.png" alt="Avatar"><p>{content}</p></div>`;
+  var sending = 0;
+  var scroll = document.getElementById('ans');
+  var last_key = "";
+  //read localStorage
+  var short_chat = localStorage.getItem("short_chat");
+  var long_chat = localStorage.getItem("long_chat");
+  var large_content_id = localStorage.getItem("large_content_id");
+  if(short_chat === null) {
+    short_chat = shortcontent_html.replace("{content}", "Hi, I'm Aili. 😃<br/>Your Uni. assistant.<br/>When you have something of interest or what problems are encountered in the university, please come to me.");
+  }
+
+  if(long_chat === null) long_chat = "";
+
+  if(large_content_id === null){
+    large_content_id = 0;
+  }else{
+    large_content_id = parseInt(large_content_id);
+  }
+
+  //restore history
+  $('#ans').html(short_chat);
+  $('#large_content').html(long_chat);
+
+  //resize element
+  if(screen.width <= 1024){
+    $("#chatbutton").css("zoom","190%");
+    $("#chatwindow").css("zoom","200%");
+    $("#large_content").css("zoom","126%");
+  }
+
+  function cache_short(output){
+    short_chat += output;
+    localStorage.setItem("short_chat",short_chat);
+    return output;
+  }
+
+  function cache_long(output){
+    long_chat += output;
+    localStorage.setItem("long_chat",long_chat);
+    return output;
+  }
+
+  function initAll() {
+    var accordions = document.querySelectorAll('[data-hbui="accordion"]');
+    [].forEach.call(accordions, function(el) {new handbook.Accordion({ container: el })});
+
+    const tabContainers = document.querySelectorAll('[data-hbui="tab-container"]') ? document.querySelectorAll('[data-hbui="tab-container"]') : [];
+    [].forEach.call(tabContainers, function(container) {
+      new handbook.Browse({
+    	container
+      }).init();
+    });
+
+    var accordionLists = document.querySelectorAll('[data-hbui="accordion-list"]');
+    [].forEach.call(accordionLists, function(el) {new handbook.Accordion({ container: el , list: true })});
+
+    var mobileNavs = document.querySelectorAll('[data-hbui="mobile-nav"]');
+    [].forEach.call(mobileNavs, function(el) {new handbook.MobileNavigation({ container: el })});
+  }
+
+  function short_content(content){
+    return shortcontent_html.replace("{content}", content)
+  }
+
+  function large_content(id, content){
+    return largetcontent_html.replace("{id}",id.toString()).replace("{content}", content);
+  }
+
+  function large_button(id){
+    return button_html.replace("{id}",id.toString())
+  }
+
+  function reply_question(question){
+    $("#question").val("");
+
+    my_msg = user_html.replace("{my_content}", question.replace(/</g,"＜").replace(/>/g,"＞"));
+
+    $('#ans').append(cache_short(my_msg));
+    $('#ans').append(loading_animation);
+
+    scroll.scrollTop = scroll.scrollHeight;
+
+    $.post("/query",{'question':question + last_key}, function(ans){
+      ans_split = ans.split("<$s$>");
+      if(ans_split.length > 1){
+        ans = ans_split[0];
+        last_key = "<$s$>"+ans_split[1];
+      }else if(ans != "I will seriously think about this question and hope to answer you next time."){
+        last_key = "";
+      }
+      $('#ans').find(".loading").remove();
+      if(ans.length > 500){
+        $('#ans').append(cache_short(large_button(large_content_id)));
+        $('#large_content').append(cache_long(large_content(large_content_id, ans)));
+        initAll();
+        $('#'+large_content_id).modal('show');
+      }else{
+         $('#ans').append(cache_short(short_content(ans)));
+      }
+
+      scroll.scrollTop = scroll.scrollHeight;
+      large_content_id = large_content_id + 1;
+      localStorage.setItem("large_content_id", large_content_id);
+      sending = 0;
+    });
+  }
+
+  $("#question").keyup(function(event){
+    var question = $("#question").val();
+    if(event.keyCode ==13 && question != "" && sending == 0){
+      sending = 1;
+      reply_question(question);
+      }
+  });
+
+  $("#ask").click(function(){
+    var question = $("#question").val();
+    if(question != "" && sending == 0){
+      sending = 1;
+      reply_question(question);
+    }
+  });
+
+  $("#chatbutton").click(function(){
+    $("#chatwindow").modal('show');
+    $("#chatwindow").one("webkitTransitionEnd", function(event) {
+         scroll.scrollTop = scroll.scrollHeight;
+       });
+  });
+
+  $(document).on("click","button.close", function(){
+    $(this).closest('.modal').modal('hide');
+  });
+
+  $("#clear").click(function(){
+    localStorage.clear();
+    $("#ans").empty();
+    $("#large_content").empty();
+    large_content_id = 0;
+  });
+
+  initAll();
+
+});
+</script>
+
+</head>
+
+<body style="background-color: white;">
+
+  <div class="container">
+    <div class="text-center" style="margin:250px auto;">
+        <button type="button" id="chatbutton" class="btn btn-info">Chat</button>
+    </div>
+
+    <div class="modal fade" id="chatwindow" role="dialog" data-keyboard="false" data-backdrop="static">
+        <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <button type="button" class="btn btn-outline-info btn-sm" id="clear"><small>Clear Chat History<small></button>
+                  <button type="button" class="close" >&times;</button>
+              </div>
+              <div class="modal-body" style="height: 600px;">
+                  <div id="ans"></div>
+              </div>
+              <div class="modal-footer" >
+                <div class="input-group mb-3">
+                  <div class="input-group-prepend" style="width:40px" id="voice_div"><div class="osahanloading" id="recording"></div><img src="/static/radio.png"  id="voice" onclick="startButton(event)"></div>
+                  <input type="text" class="form-control" placeholder="Try to ask me &quot;what can you do&quot;" id="question">
+                  <div class="input-group-append"><button type="button" class="btn btn-info" id="ask">Send</button></div>
+                </div>
+              </div>
+            </div>
+        </div>
+    </div>
+    <div id="large_content"></div>
+  </div>
+
+</body>
+
+</html>

@@ -1,0 +1,22 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+flask = "*"
+"beautifulsoup4" = "*"
+nltk = "*"
+requests = "*"
+gunicorn = "*"
+sklearn = "*"
+numpy = "*"
+scipy = "*"
+google-api-python-client = "*"
+python-dotenv = "*"
+flask-pymongo = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "*"
